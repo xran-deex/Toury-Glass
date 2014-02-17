@@ -7,20 +7,25 @@
     <uses-sdk
         android:minSdkVersion="15"
         android:targetSdkVersion="15" />
+    
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
 
     <application
         android:allowBackup="true"
         android:icon="@drawable/ic_launcher"
-        android:label="@string/app_name"
-        android:theme="@style/AppTheme" >
-        <activity
-            android:name="twilight.of.the.devs.touryglass.MainActivity"
-            android:label="@string/app_name" >
+        android:label="@string/app_name">
+        <service android:name="twilight.of.the.devs.touryglass.TouryService">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.google.android.glass.action.VOICE_TRIGGER" />
             </intent-filter>
+            <meta-data
+                android:name="com.google.android.glass.VoiceTrigger"
+                android:resource="@xml/trigger" />
+        </service>
+        <activity
+            android:name="twilight.of.the.devs.touryglass.MainActivity" 
+            android:theme="@style/MenuTheme">
+
         </activity>
     </application>
 
