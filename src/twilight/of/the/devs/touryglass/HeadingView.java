@@ -61,6 +61,7 @@ public class HeadingView extends View {
 	}
 	
 	public void setGeofence(String g){
+		if(g == null) return;
 		mGeofence = g;
 		
 	}
@@ -72,8 +73,8 @@ public class HeadingView extends View {
 
 		if(mGeofence.length() > 0){
 			canvas.drawText(mGeofence.substring(0, 21), 20, 64, mPaint);
-			canvas.drawText(mGeofence.substring(21, 42), 20, 128, mPaint);
-			canvas.drawText(mGeofence.substring(42), 20, 192, mPaint);
+			canvas.drawText(mGeofence.substring(21), 20, 128, mPaint);
+//			canvas.drawText(mGeofence.substring(42), 20, 192, mPaint);
 			
 		}
 		canvas.drawText("Heading: " + mHeading, 20, 256, mPaint);

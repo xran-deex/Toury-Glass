@@ -39,6 +39,8 @@ import com.google.android.glass.timeline.DirectRenderingCallback;
 import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.LocationClient;
 
+import twilight.of.the.devs.mylibrary.*;
+
 public class LiveCardRenderer implements DirectRenderingCallback {
 
     // About 30 FPS.
@@ -53,6 +55,7 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 	private OrientationManager mOrientationManager;
 	//private Layout layout;
 	private HeadingView mHeadingView;
+	private SimpleGeofence mGeofence;
 	
 	private Context mContext;
 	
@@ -61,57 +64,59 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 		@Override
 		public void onReceive(Context context, final Intent intent) {
 			Log.d(TAG, "Received location");
-			//mHeadingView.setGeofence((intent.getStringExtra("loc")));
+			mGeofence = ((SimpleGeofence)intent.getSerializableExtra("loc"));
+			//Log.d(TAG, geofence.toString());
+			//mHeadingView.setGeofence(geofence.getDescription());
 		    	
-		    	new AsyncTask<Void, Void, SimpleGeofence>(){
-
-					@Override
-					protected SimpleGeofence doInBackground(Void... params) {
-						List<Geofence> result = new LinkedList<Geofence>();
-						HttpClient client = new DefaultHttpClient();
-		                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
-		                HttpResponse response;
-		                String path = intent.getStringExtra("loc");
-		                String[] parts = path.split("/");
-		                SimpleGeofence g = null;
-		                try {
-		                    HttpGet post = new HttpGet("http://valis.strangled.net:9000/api/tours/" + parts[parts.length-1]);
-		                    String authorizationString = "Basic " + Base64.encodeToString(
-		    				        ("randy" + ":" + "greenday").getBytes(),
-		    				        Base64.NO_WRAP); 
-		                    
-		                    
-		                    post.addHeader("Authorization", authorizationString);
-		                    response = client.execute(post);
-		                    
-		                    
-
-		                    /*Checking response */
-		                    if(response!=null){
-		                        InputStream in = response.getEntity().getContent(); //Get the data in the entity
-		                        String res = new DataInputStream(in).readLine();
-		                        JSONObject obj = new JSONObject(res);
-		                        g = new SimpleGeofence(obj.getString("url"), obj.getDouble("latitude"), obj.getDouble("longitude"), (float) obj.getDouble("radius"), 100000000L, Geofence.GEOFENCE_TRANSITION_ENTER|Geofence.GEOFENCE_TRANSITION_EXIT|Geofence.GEOFENCE_TRANSITION_DWELL);
-
-		                        g.setDescription(obj.getString("description"));
-		                    }
-
-		                } catch(Exception e) {
-		                    e.printStackTrace();
-		                }
-		                
-		                	
-						return g;
-					}
-					
-					@Override
-					protected void onPostExecute(
-							twilight.of.the.devs.touryglass.SimpleGeofence result) {
-						mHeadingView.setGeofence(result.getDescription());
-						super.onPostExecute(result);
-					}
-		    		
-		    	}.execute();
+//		    	new AsyncTask<Void, Void, SimpleGeofence>(){
+//
+//					@Override
+//					protected SimpleGeofence doInBackground(Void... params) {
+//						List<Geofence> result = new LinkedList<Geofence>();
+//						HttpClient client = new DefaultHttpClient();
+//		                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
+//		                HttpResponse response;
+//		                String path = intent.getStringExtra("loc");
+//		                String[] parts = path.split("/");
+//		                SimpleGeofence g = null;
+//		                try {
+//		                    HttpGet post = new HttpGet("http://valis.strangled.net:9000/api/tours/" + parts[parts.length-1]);
+//		                    String authorizationString = "Basic " + Base64.encodeToString(
+//		    				        ("randy" + ":" + "greenday").getBytes(),
+//		    				        Base64.NO_WRAP); 
+//		                    
+//		                    
+//		                    post.addHeader("Authorization", authorizationString);
+//		                    response = client.execute(post);
+//		                    
+//		                    
+//
+//		                    /*Checking response */
+//		                    if(response!=null){
+//		                        InputStream in = response.getEntity().getContent(); //Get the data in the entity
+//		                        String res = new DataInputStream(in).readLine();
+//		                        JSONObject obj = new JSONObject(res);
+//		                        g = new SimpleGeofence(obj.getString("url"), obj.getDouble("latitude"), obj.getDouble("longitude"), (float) obj.getDouble("radius"), 100000000L, Geofence.GEOFENCE_TRANSITION_ENTER|Geofence.GEOFENCE_TRANSITION_EXIT|Geofence.GEOFENCE_TRANSITION_DWELL);
+//
+//		                        g.setDescription(obj.getString("description"));
+//		                    }
+//
+//		                } catch(Exception e) {
+//		                    e.printStackTrace();
+//		                }
+//		                
+//		                	
+//						return g;
+//					}
+//					
+//					@Override
+//					protected void onPostExecute(
+//							twilight.of.the.devs.touryglass.SimpleGeofence result) {
+//						mHeadingView.setGeofence(result.getDescription());
+//						super.onPostExecute(result);
+//					}
+//		    		
+//		    	}.execute();
 		}
 	};
 
@@ -136,6 +141,12 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 			public void onOrientationChanged(OrientationManager orientationManager) {
 				mHeading = mOrientationManager.getHeading();
 				mHeadingView.setHeading(mHeading);
+				
+				if(mGeofence != null && isWithinTenDegrees((int)mHeading, (int)mGeofence.getDirection()))
+					mHeadingView.setGeofence(mGeofence.getDescription());
+				else if (mGeofence != null){
+					mHeadingView.setGeofence("");
+				}
 			}
 			
 			@Override
@@ -151,6 +162,10 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 			}
 		});
     	mOrientationManager.start();
+	}
+	
+	public boolean isWithinTenDegrees(int one, int two){
+		return Math.abs(one - two) <= 10;
 	}
 
     @Override

@@ -7,6 +7,8 @@ import java.io.OutputStream;
 import java.net.SocketException;
 import java.util.UUID;
 
+import twilight.of.the.devs.mylibrary.SimpleGeofence;
+
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
@@ -18,6 +20,7 @@ import android.util.Log;
 
 public class ServerThread extends Thread { 
 
+	private static final String TAG = ServerThread.class.getName();
 	private BluetoothServerSocket mmServerSocket = null;
 	private BluetoothSocket socket = null;
 	private BluetoothAdapter mBluetoothAdapter;
@@ -95,7 +98,9 @@ public class ServerThread extends Thread {
             // Read from the InputStream
         	ois = new ObjectInputStream(mmInStream);
             // Send the obtained bytes to the UI activity
-        	String command = (String)ois.readObject();
+        	SimpleGeofence command = (SimpleGeofence)ois.readObject();
+        	
+        	Log.d(TAG, command.toString());
 
         	Intent i = new Intent("location");
         	i.putExtra("loc", command);
