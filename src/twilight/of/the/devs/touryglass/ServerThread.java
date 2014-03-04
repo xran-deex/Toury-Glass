@@ -5,8 +5,11 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.net.SocketException;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 
+import twilight.of.the.devs.mylibrary.Marker;
 import twilight.of.the.devs.mylibrary.SimpleGeofence;
 
 import android.bluetooth.BluetoothAdapter;
@@ -98,13 +101,21 @@ public class ServerThread extends Thread {
             // Read from the InputStream
         	ois = new ObjectInputStream(mmInStream);
             // Send the obtained bytes to the UI activity
-        	SimpleGeofence command = (SimpleGeofence)ois.readObject();
-        	
-        	Log.d(TAG, command.toString());
-
-        	Intent i = new Intent("location");
-        	i.putExtra("loc", command);
-        	LocalBroadcastManager.getInstance(mContext).sendBroadcast(i);
+        	Object obj = ois.readObject();
+        	if(obj instanceof Marker){
+        		Marker m = (Marker)obj;
+        		Intent i = new Intent("marker");
+            	i.putExtra("loc", m);
+            	LocalBroadcastManager.getInstance(mContext).sendBroadcast(i);
+        	} else {
+	        	LinkedList<Marker> command = (LinkedList<Marker>)obj;
+	        	if(command == null) return;
+	        	Log.d(TAG, "Received: " + command.toString());
+	
+	        	Intent i = new Intent("location");
+	        	i.putExtra("loc", command);
+	        	LocalBroadcastManager.getInstance(mContext).sendBroadcast(i);
+        	}
 
         } catch (IOException e) {
         	Log.d("ServerService", e.getMessage());

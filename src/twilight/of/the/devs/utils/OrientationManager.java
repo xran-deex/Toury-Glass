@@ -142,12 +142,12 @@ public class OrientationManager {
                 float magneticHeading = (float) Math.toDegrees(mOrientation[0]);
                 mHeading = MathUtils.mod(computeTrueNorth(magneticHeading), 360.0f)
                         - ARM_DISPLACEMENT_DEGREES;
-                long time = event.timestamp;
-                if(time - mTimeSinceLastSensor > 20500000L){
-                	notifyOrientationChanged();
-                	//Log.d(TAG, ""+mTimeSinceLastSensor);
-                }
-                mTimeSinceLastSensor = time;
+//                long time = event.timestamp;
+//                if(time - mTimeSinceLastSensor > 20500000L){
+                notifyOrientationChanged();
+//                	//Log.d(TAG, ""+mTimeSinceLastSensor);
+//                }
+//                mTimeSinceLastSensor = time;
             }
         }
     };
@@ -196,6 +196,8 @@ public class OrientationManager {
         criteria.setSpeedRequired(false);
 
         mLocationProvider = mLocationManager.getBestProvider(criteria, true /* enabledOnly */);
+        if(mLocationProvider == null)
+        Log.d(TAG, "Location provider is null");
     }
 
     /**
