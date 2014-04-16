@@ -1,9 +1,11 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:keepScreenOn="true"
     android:background="@android:color/black">
 
-	<twilight.of.the.devs.touryglass.HeadingView
+	<twilight.of.the.devs.touryglass.TouryView
+	    android:keepScreenOn="true"
         android:id="@+id/heading"
         android:layout_width="300dp"
         android:layout_height="300dp" />

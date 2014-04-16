@@ -1,18 +1,12 @@
 package twilight.of.the.devs.touryglass;
 
-import java.io.DataInputStream;
-import java.io.InputStream;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.HttpConnectionParams;
-import org.json.JSONArray;
-import org.json.JSONObject;
-
+import twilight.of.the.devs.utils.DirectionUtils;
+import twilight.of.the.devs.utils.DirectionUtils.DIRECTION;
+import twilight.of.the.devs.utils.GeofenceManager;
 import twilight.of.the.devs.utils.OrientationManager;
 import twilight.of.the.devs.utils.OrientationManager.OnChangedListener;
 import android.content.BroadcastReceiver;
@@ -20,25 +14,19 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.hardware.SensorManager;
+import android.location.Location;
 import android.location.LocationManager;
-import android.os.AsyncTask;
 import android.os.SystemClock;
-import android.support.v4.app.Fragment;
+import android.preference.PreferenceManager;
+import android.speech.tts.TextToSpeech;
 import android.support.v4.content.LocalBroadcastManager;
-import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
-import android.view.View;
 import android.widget.FrameLayout;
 
 import com.google.android.glass.timeline.DirectRenderingCallback;
-import com.google.android.gms.location.Geofence;
-import com.google.android.gms.location.LocationClient;
-
 import twilight.of.the.devs.mylibrary.*;
 
 public class LiveCardRenderer implements DirectRenderingCallback {
@@ -53,10 +41,10 @@ public class LiveCardRenderer implements DirectRenderingCallback {
     private RenderThread mRenderThread;
     private float mHeading;
 	private OrientationManager mOrientationManager;
-	//private Layout layout;
-	private HeadingView mHeadingView;
-	private Marker mGeofence;
+	private Location mCurrentLocation;
+	private TouryView mTouryView;
 	private List<Marker> mMarkerList;
+	private TouryService mService;
 	
 	private Context mContext;
 	
@@ -65,9 +53,9 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 		@Override
 		public void onReceive(Context context, final Intent intent) {
 			Log.d(TAG, "Received location");
-			mHeadingView.setRenderer(LiveCardRenderer.this);
-			setMarkerList(((List<Marker>)intent.getSerializableExtra("loc")));
-			mHeadingView.setGeofence(mMarkerList);
+			mTouryView.setRenderer(LiveCardRenderer.this);
+			mTouryView.setMarkerList(mMarkerList);
+			geofenceManager.setMarkerList(mMarkerList);
 		}
 	};
 	
@@ -75,25 +63,87 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 
 		@Override
 		public void onReceive(Context context, final Intent intent) {
+//			Log.d(TAG, "Received marker");
+//			MARKER_STATE state = (MARKER_STATE)intent.getSerializableExtra("type");
+//			mHeadingView.setRenderer(LiveCardRenderer.this);
+//			if(state == MARKER_STATE.ENTERED){
+//				mService.getTTS().speak("There is something to look at.", TextToSpeech.QUEUE_FLUSH, null);
+//			} else if (state == MARKER_STATE.DWELLING){
+//				mHeadingView.setTriggeredMarker((Marker)intent.getSerializableExtra("loc"));
+//			} else if (state == MARKER_STATE.EXITED){
+//				mHeadingView.setMarkerList(new LinkedList<Marker>());
+//			}
+		}
+	};
+	
+	private BroadcastReceiver mGeofenceReceiver = new BroadcastReceiver(){
+
+		@Override
+		public void onReceive(Context context, final Intent intent) {
 			Log.d(TAG, "Received marker");
-			mHeadingView.setRenderer(LiveCardRenderer.this);
-			mHeadingView.setTriggeredMarker((Marker)intent.getSerializableExtra("loc"));
+			
+			MARKER_STATE state = (MARKER_STATE)intent.getSerializableExtra("type");
+			Marker marker = (Marker)intent.getSerializableExtra("marker");
+			mTouryView.setRenderer(LiveCardRenderer.this);
+			if(state == MARKER_STATE.ENTERED){
+				
+				Location location = new Location("");
+				location.setLatitude(marker.getMarkerLatitude());
+				location.setLongitude(marker.getMarkerLongitude());
+				double bearingTo = DirectionUtils.convertBearing(mCurrentLocation.bearingTo(location));
+				Log.d(TAG, "BearingTo: " + bearingTo + ", Heading: " + mHeading);
+				DIRECTION direction = DirectionUtils.isOnWhichSide(bearingTo, mHeading);
+				if(direction == DIRECTION.LEFT){
+					if(mService.getTTS() != null)
+						mService.getTTS().speak("There is something to look at on your left.", TextToSpeech.QUEUE_ADD, null);
+				} else if (direction == DIRECTION.RIGHT){
+					if(mService.getTTS() != null)
+						mService.getTTS().speak("There is something to look at on your right.", TextToSpeech.QUEUE_ADD, null);
+				} else if (direction == DIRECTION.BEHIND){
+					if(mService.getTTS() != null)
+						mService.getTTS().speak("There is something to look at behind you.", TextToSpeech.QUEUE_ADD, null);
+				}
+				mTouryView.setTriggeredMarker(marker);
+			} else if (state == MARKER_STATE.DWELLING){
+//				if(mService.getTTS() != null)
+//					mService.getTTS().speak("You are dwelling in a geofence." + marker.getDescription(), TextToSpeech.QUEUE_FLUSH, null);
+				Log.d(TAG, "Dwelling in " + marker.getTitle());
+				mTouryView.setTriggeredMarker(marker);
+				if(PreferenceManager.getDefaultSharedPreferences(mService).getBoolean("ordered", false)){
+					mMarkerList.remove(0);
+					mService.getTTS().speak("Your next destination is " + mMarkerList.get(0).getTitle(), TextToSpeech.QUEUE_ADD, null);
+					mTouryView.setMarkerList(mMarkerList);
+					geofenceManager.setMarkerList(mMarkerList);
+				}
+			} else if (state == MARKER_STATE.EXITED){
+//				if(mService.getTTS() != null)
+//					mService.getTTS().speak("You have left a geofence.", TextToSpeech.QUEUE_FLUSH, null);
+				mTouryView.removeTriggeredMarker();
+			}
 		}
 	};
 
 	private ServerThread mServerThread;
+
+	private GeofenceManager geofenceManager;
 	
-	public LiveCardRenderer(Context context) {
+	public LiveCardRenderer(TouryService context) {
 		this.mContext = context;
+		this.mService = context;
 		LayoutInflater inflater = LayoutInflater.from(mContext);
 		FrameLayout layout = (FrameLayout)inflater.inflate(R.layout.activity_main, null);
 		mServerThread = new ServerThread(context);
 		mServerThread.start();
 		LocalBroadcastManager.getInstance(context).registerReceiver(mReceiver, new IntentFilter("location"));
-		LocalBroadcastManager.getInstance(context).registerReceiver(mMarkerReceiver, new IntentFilter("marker"));
+		//LocalBroadcastManager.getInstance(context).registerReceiver(mMarkerReceiver, new IntentFilter("marker"));
+		LocalBroadcastManager.getInstance(context).registerReceiver(mGeofenceReceiver, new IntentFilter("geofence"));
+		
+		mTouryView = (TouryView)layout.findViewById(R.id.heading);
+		mTouryView.setRenderer(this);
+		mTouryView.setService(mService);
 		setMarkerList(new LinkedList<Marker>());
-		mHeadingView = (HeadingView)layout.findViewById(R.id.heading);
-		mHeadingView.setRenderer(this);
+		geofenceManager = new GeofenceManager(mMarkerList, mService);
+		geofenceManager.setMarkerList(mMarkerList);
 		SensorManager sensorManager =
                 (SensorManager) mContext.getSystemService(Context.SENSOR_SERVICE);
         LocationManager locationManager =
@@ -105,20 +155,20 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 			@Override
 			public void onOrientationChanged(OrientationManager orientationManager) {
 				mHeading = mOrientationManager.getHeading();
-				mHeadingView.setHeading(mHeading);
-				mHeadingView.setCurrentLocation(orientationManager.getLocation());
+				mTouryView.setHeading(mHeading);
+				mTouryView.setCurrentLocation(orientationManager.getLocation());
 			}
 			
 			@Override
 			public void onLocationChanged(OrientationManager orientationManager) {
 				Log.d(TAG, "Location changed");
-				mHeadingView.setCurrentLocation(orientationManager.getLocation());
+				mCurrentLocation = orientationManager.getLocation();
+				mTouryView.setCurrentLocation(orientationManager.getLocation());
+				geofenceManager.checkGeofences(orientationManager.getLocation());
 			}
 			
 			@Override
 			public void onAccuracyChanged(OrientationManager orientationManager) {
-				// TODO Auto-generated method stub
-				
 			}
 		});
     	mOrientationManager.start();
@@ -127,10 +177,13 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 	public boolean isWithinTenDegrees(int one, int two){
 		return Math.abs(one - two) <= 10;
 	}
+	
+	public TouryView getTouryView(){
+		return mTouryView;
+	}
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        // Update your views accordingly.
     }
 
     @Override
@@ -149,6 +202,8 @@ public class LiveCardRenderer implements DirectRenderingCallback {
         mServerThread.closeSocket();
         mRenderThread.quit();
         mRenderThread = null;
+        mOrientationManager.stop();
+        
 //        updateRendering();
     }
 
@@ -187,7 +242,7 @@ public class LiveCardRenderer implements DirectRenderingCallback {
             return;
         }
         if (canvas != null) {
-        	mHeadingView.draw(canvas);
+        	mTouryView.draw(canvas);
             mHolder.unlockCanvasAndPost(canvas);
         }
     }
@@ -198,6 +253,14 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 
 	public void setMarkerList(List<Marker> mMarkerList) {
 		this.mMarkerList = mMarkerList;
+		Log.d(TAG, "Before sort: " + this.mMarkerList.toString());
+		Collections.sort(this.mMarkerList, new MarkerOrderingComp());
+		Log.d(TAG, "After sort: " + this.mMarkerList.toString());
+		mTouryView.setMarkerList(mMarkerList);
+		if(geofenceManager != null){
+			geofenceManager.setMarkerList(mMarkerList);
+		}
+		Log.d(TAG, mMarkerList.toString());
 	}
 
 	/**

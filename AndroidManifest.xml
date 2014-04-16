@@ -29,7 +29,12 @@
                 android:name="com.google.android.glass.VoiceTrigger"
                 android:resource="@xml/trigger" />
         </service>
+        <service android:name="twilight.of.the.devs.touryglass.SyncService"></service>
+        <provider android:name="twilight.of.the.devs.touryglass.provider.TouryProvider"
+		    android:authorities="twilight.of.the.devs.touryglass.provider.TouryProvider">
+		</provider>
         <activity
+            android:immersive="true"
             android:name="twilight.of.the.devs.touryglass.MainActivity" 
             android:theme="@style/MenuTheme">
 			

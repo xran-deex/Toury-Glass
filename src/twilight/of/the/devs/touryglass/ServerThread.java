@@ -5,10 +5,12 @@ import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.OutputStream;
 import java.net.SocketException;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
+import twilight.of.the.devs.mylibrary.MARKER_STATE;
 import twilight.of.the.devs.mylibrary.Marker;
 import twilight.of.the.devs.mylibrary.SimpleGeofence;
 
@@ -102,18 +104,29 @@ public class ServerThread extends Thread {
         	ois = new ObjectInputStream(mmInStream);
             // Send the obtained bytes to the UI activity
         	Object obj = ois.readObject();
-        	if(obj instanceof Marker){
-        		Marker m = (Marker)obj;
+        	Log.d(TAG, obj.toString());
+        	MARKER_STATE state = (MARKER_STATE)obj;
+        	if(state == MARKER_STATE.ENTERED){
+        		Marker m = (Marker)ois.readObject();
         		Intent i = new Intent("marker");
-            	i.putExtra("loc", m);
+            	i.putExtra("marker", m);
+            	i.putExtra("type", state);
             	LocalBroadcastManager.getInstance(mContext).sendBroadcast(i);
-        	} else {
-	        	LinkedList<Marker> command = (LinkedList<Marker>)obj;
+        	} else if (state == MARKER_STATE.INITIALIZE_LIST){
+	        	LinkedList<Marker> command = new LinkedList<Marker>(Arrays.asList((Marker[])ois.readObject()));
 	        	if(command == null) return;
 	        	Log.d(TAG, "Received: " + command.toString());
 	
 	        	Intent i = new Intent("location");
 	        	i.putExtra("loc", command);
+	        	LocalBroadcastManager.getInstance(mContext).sendBroadcast(i);
+        	} else if (state == MARKER_STATE.DWELLING){
+        		Intent i = new Intent("marker");
+	        	i.putExtra("type", state);
+	        	LocalBroadcastManager.getInstance(mContext).sendBroadcast(i);
+        	} else if (state == MARKER_STATE.EXITED){
+        		Intent i = new Intent("marker");
+	        	i.putExtra("type", state);
 	        	LocalBroadcastManager.getInstance(mContext).sendBroadcast(i);
         	}
 

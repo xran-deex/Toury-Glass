@@ -1,10 +1,16 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android" >
 
-    <item
-        android:id="@+id/action_settings"
-        android:orderInCategory="100"
-        android:showAsAction="never"
-        android:title="@string/action_settings"/>
-    <item android:id="@+id/stop" android:title="Stop"></item>
+    <item android:id="@+id/stop" android:title="Stop" android:orderInCategory="100"></item>
+    <item android:id="@+id/sync" android:title="Sync" android:orderInCategory="99"></item>
+    <item android:id="@+id/load_tour" android:title="Tours" android:orderInCategory="1">
+        <menu>
+            <item android:id="@+id/placeholder" android:title="placeholder"></item>
+        </menu>
+    </item>
+    <item android:id="@+id/debug" android:title="Debug On/Off" android:orderInCategory="4"></item>
+    <item android:id="@+id/autoload" android:title="Auto-Load On/Off" android:orderInCategory="5"></item>
+    <item android:id="@+id/search" android:title="Search"
+        android:icon="@android:drawable/ic_menu_search" android:orderInCategory="3"></item>
+    <item android:id="@+id/ordered" android:title="Guided On/Off" android:orderInCategory="2"></item>
 
 </menu>
