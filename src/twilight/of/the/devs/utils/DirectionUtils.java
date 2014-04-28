@@ -1,24 +1,51 @@
 package twilight.of.the.devs.utils;
 
 import android.location.Location;
+import android.util.Log;
 
+/*
+ * Utilities for determining the user's direction
+ */
 public class DirectionUtils {
 
-	public enum DIRECTION {LEFT, RIGHT, BEHIND};
+	public enum DIRECTION {LEFT, RIGHT, BEHIND}
+
+	private static final String TAG = DirectionUtils.class.getName();
 	
+	/*
+	 * Determines on which side of the user the current marker is.
+	 * @param bearingTo the bearing to the marker we want to determine the side of
+	 * @param currentHeading the user's currentHeading
+	 */
 	public static DIRECTION isOnWhichSide(double bearingTo, double currentHeading){
 		double diff = Math.abs(bearingTo - currentHeading);
-		if(bearingTo < currentHeading && diff < 110 && diff > 80) return DIRECTION.LEFT;
-		else if (Math.abs(bearingTo - currentHeading) < 110 && diff > 80) return DIRECTION.RIGHT;
+		if(bearingTo > 270 && currentHeading < 90){
+			bearingTo = 360 - bearingTo;
+			diff = bearingTo + currentHeading;
+		} else if (bearingTo < 90 && currentHeading > 270){
+			currentHeading = 360 - currentHeading;
+			diff = currentHeading + bearingTo;
+		}
+		if(diff < 0) diff += 360;
+		Log.d(TAG, "Diff " + diff);
+		
+		//Return left, right, or behind based on the previous calculations
+		if(bearingTo < currentHeading && diff < 80) return DIRECTION.LEFT;
+		else if (bearingTo > currentHeading && diff < 80) return DIRECTION.RIGHT;
 		else return DIRECTION.BEHIND;
 	}
 	
+	/*
+	 * Converts a negative bearing to positive
+	 * @param bearing the bearing
+	 * @return the new (non-negative) bearing
+	 */
 	public static double convertBearing(double bearing){
 		if(bearing >= 0) return bearing;
-		
-		//return (Math.abs(bearing) + 180) % 360;
 		return bearing + 360;
 	}
+	
+	/* The following code is from the Android Compass Example Code */
 	
 	/**
      * Calculates {@code a mod b} in a way that respects negative values (for example,

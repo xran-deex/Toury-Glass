@@ -7,7 +7,8 @@
             <item android:id="@+id/placeholder" android:title="placeholder"></item>
         </menu>
     </item>
-    <item android:id="@+id/debug" android:title="Debug On/Off" android:orderInCategory="4"></item>
+    <!-- <item android:id="@+id/debug" android:title="Debug On/Off" android:orderInCategory="4"></item> -->
+    <item android:id="@+id/distances" android:title="Show Distances" android:orderInCategory="4"></item>
     <item android:id="@+id/autoload" android:title="Auto-Load On/Off" android:orderInCategory="5"></item>
     <item android:id="@+id/search" android:title="Search"
         android:icon="@android:drawable/ic_menu_search" android:orderInCategory="3"></item>

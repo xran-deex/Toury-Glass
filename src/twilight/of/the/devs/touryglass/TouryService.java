@@ -1,29 +1,13 @@
 package twilight.of.the.devs.touryglass;
 
-import java.io.DataInputStream;
-import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.HttpConnectionParams;
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import twilight.of.the.devs.mylibrary.MARKER_STATE;
 import twilight.of.the.devs.mylibrary.Marker;
 import twilight.of.the.devs.touryglass.provider.TouryProvider.TouryProviderMetaData;
 import twilight.of.the.devs.touryglass.provider.TouryProvider.TouryProviderMetaData.MarkersTableMetaData;
-import twilight.of.the.devs.utils.GeofenceManager;
-
 import com.google.android.glass.timeline.LiveCard;
-import com.google.android.glass.timeline.TimelineManager;
 import com.google.android.gms.location.Geofence;
-import com.google.android.gms.location.LocationClient;
-
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
@@ -35,7 +19,6 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.speech.tts.TextToSpeech;
-import android.util.Base64;
 import android.util.Log;
 
 public class TouryService extends Service {
@@ -44,29 +27,16 @@ public class TouryService extends Service {
 	private static final String TAG = TouryService.class.getName();
 	private LiveCard mLiveCard;
 	private boolean showTourList = false;
-	private LinkedList<Geofence> mGeofences;
-	public LinkedList<Geofence> getGeofences() {
-		return mGeofences;
-	}
-
-	public void setGeofences(LinkedList<Geofence> mGeofences) {
-		this.mGeofences = mGeofences;
-	}
-
 	private LinkedList<Marker> mCurrentMarkers;
-	
-	public LinkedList<Marker> getCurrentMarkers() {
-		return mCurrentMarkers;
-	}
-
-	public void setCurrentMarkers(LinkedList<Marker> mCurrentMarkers) {
-		this.mCurrentMarkers = mCurrentMarkers;
-	}
+	private LinkedList<Geofence> mGeofences;
 
 	private final IBinder mBinder = new LocalBinder();
 	private TextToSpeech mSpeech;
 	private LiveCardRenderer mLiveCardRenderer;
 	
+	/*
+	 * Bind to the TouryService
+	 */
 	public class LocalBinder extends Binder {
         TouryService getService() {
             // Return this instance of LocalService so clients can call public methods
@@ -78,14 +48,25 @@ public class TouryService extends Service {
 		super();
 	}
 	
+	/*
+	 * Access the LiveCardRenders
+	 */
 	public LiveCardRenderer getRenderer(){
 		return mLiveCardRenderer;
 	}
 	
-	public void showTourList(boolean yes){
-		showTourList = yes;
+	/*
+	 * Tour list setter
+	 * @param showTourList 
+	 */
+	public void showTourList(boolean showTourList){
+		this.showTourList = showTourList;
 	}
 	
+	/*
+	 * Tour list getter
+	 * @return true if the tour list should be shown
+	 */
 	public boolean showTourList(){
 		return showTourList;
 	}
@@ -95,6 +76,10 @@ public class TouryService extends Service {
 		return mBinder;
 	}
 	
+	/*
+	 * Accessor for the text to speech engine
+	 * @return TextToSpeech the current TTS engine
+	 */
 	public TextToSpeech getTTS(){
 		return mSpeech;
 	}
@@ -114,18 +99,18 @@ public class TouryService extends Service {
                 // Do nothing.
             }
         });
-		return START_NOT_STICKY;
+		return START_STICKY;
 	}
 	
+	/*
+	 * Publish the live card
+	 */
 	private void publishCard(Context context) {
 	    if (mLiveCard == null) {
-	        TimelineManager tm = TimelineManager.from(context);
-	        mLiveCard = tm.createLiveCard(LIVE_CARD_TAG);
-
+	    	mLiveCard = new LiveCard(this, LIVE_CARD_TAG);
 	        // Enable direct rendering.
-	        mLiveCard.setDirectRenderingEnabled(true);
 	        mLiveCardRenderer = new LiveCardRenderer(this);
-	        mLiveCard.getSurfaceHolder().addCallback(mLiveCardRenderer);
+	        mLiveCard.setDirectRenderingEnabled(true).getSurfaceHolder().addCallback(mLiveCardRenderer);
 
 	        Intent intent = new Intent(context, MainActivity.class);
 	        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -134,6 +119,7 @@ public class TouryService extends Service {
 	        mLiveCard.publish(LiveCard.PublishMode.REVEAL);
 	    } else {
 	        // Card is already published.
+	    	mLiveCard.navigate();
 	        return;
 	    }
 	}
@@ -153,99 +139,76 @@ public class TouryService extends Service {
 			
 			mLiveCardRenderer = null;
 		}
-		
+		Log.d(TAG, "Service onDestroy");
 		super.onDestroy();
 	}
 	
+	/*
+	 * Access the geofence list
+	 * @return LinkedList<Geofence> the current list of geofences
+	 */
+	public LinkedList<Geofence> getGeofences() {
+		return mGeofences;
+	}
+
+	/*
+	 * Setter for the geofence list
+	 * @param mGeofences the list of geofences to be set
+	 */
+	public void setGeofences(LinkedList<Geofence> mGeofences) {
+		this.mGeofences = mGeofences;
+	}
+	
+	/*
+	 * Access the marker list
+	 * @return LinkedList<Marker> the current list of markers
+	 */
+	public LinkedList<Marker> getCurrentMarkers() {
+		return mCurrentMarkers;
+	}
+
+	/*
+	 * Setter for the marker list
+	 * @param mCurrentMarkers the list of markers to set
+	 */
+	public void setCurrentMarkers(LinkedList<Marker> mCurrentMarkers) {
+		this.mCurrentMarkers = mCurrentMarkers;
+	}
+	
+	/*
+	 * Loads the markers of a given tour into memory
+	 * @param tourId the id of the selected tour
+	 */
 	public void loadTour(final int tourId){
     	
-//    	LocationFragment.tour_id = tourId;
     	new AsyncTask<Void, Void, List<Geofence>>(){
 
 			
 			@Override
 			protected List<Geofence> doInBackground(Void... params) {
-				
-//				if(loadFromREST){
-//					HttpClient client = new DefaultHttpClient();
-//	                HttpConnectionParams.setConnectionTimeout(client.getParams(), 10000); //Timeout Limit
-//	                HttpResponse response;
-//	
-//	                try {
-//	                    HttpGet post = new HttpGet("http://valis.strangled.net:7000/api/markers/");
-//	                    String authorizationString = "Basic " + Base64.encodeToString(
-//	    				        ("randy" + ":" + "greenday").getBytes(),
-//	    				        Base64.NO_WRAP); 
-//	                    
-//	                    
-//	                    post.addHeader("Authorization", authorizationString);
-//	                    response = client.execute(post);
-//	                   
-//	                    
-//	
-//	                    /*Checking response */
-//	                    if(response!=null){
-//	                        InputStream in = response.getEntity().getContent(); //Get the data in the entity
-//	                        String res = new DataInputStream(in).readLine();
-//	                        Log.d(TAG, res);
-//	                        JSONObject obj = new JSONObject(res);
-//	                        JSONArray results = obj.getJSONArray("results");
-//	                    
-//		                    for(int i = 1; i <= results.length(); i++){
-//		                    	JSONObject j = results.getJSONObject(i-1);
-//		                    	Marker g = new Marker();
-//		                    	g.setId(j.getInt("id"));
-//		                    	g.setDirection(j.getDouble("direction"));
-//		                    	g.setDescription(j.getString("description"));
-//		                    	g.setTriggerLatitude(j.getDouble("trigger_latitude"));
-//		                    	g.setTriggerLongitude(j.getDouble("trigger_longitude"));
-//		                    	g.setMarkerLatitude(j.getDouble("marker_latitude"));
-//		                    	g.setMarkerLongitude(j.getDouble("marker_longitude"));
-//		                    	g.setRadius(j.getDouble("radius"));
-//		                    	g.setTitle(j.getString("title"));
-//		                    	g.setTourId(j.getInt("tour"));
-//		                    	mGeofences.add(g.toGeofence());
-//		                    	mCurrentMarkers.add(g);
-//		                    }
-//	                    }
-//	                } catch(Exception e) {
-//	                  e.printStackTrace();
-//	                }
-//				} else {
-				
 					
-					mGeofences = new LinkedList<Geofence>();
-					mCurrentMarkers = new LinkedList<Marker>();
-					Uri uri = Uri.withAppendedPath(TouryProviderMetaData.ToursTableMetaData.CONTENT_URI, "tour/" + tourId + "/markers");
-					Cursor c = getContentResolver().query(uri, null, null, null, null);
+				mGeofences = new LinkedList<Geofence>();
+				mCurrentMarkers = new LinkedList<Marker>();
+				Uri uri = Uri.withAppendedPath(TouryProviderMetaData.ToursTableMetaData.CONTENT_URI, "tour/" + tourId + "/markers");
+				Cursor c = getContentResolver().query(uri, null, null, null, null);
 
-					while(c.moveToNext()){
-						Marker g = new Marker();
-								g.setId((int)c.getLong(c.getColumnIndex(MarkersTableMetaData._ID)));
-								g.setTriggerLatitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.TRIGGER_LATITUDE)));
-								g.setTriggerLongitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.TRIGGER_LONGITUDE)));
-								g.setMarkerLatitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.MARKER_LATITUDE)));
-								g.setMarkerLongitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.MARKER_LONGITUDE)));
-								g.setRadius(c.getDouble(c.getColumnIndex(MarkersTableMetaData.RADIUS)));
-								g.setDescription(c.getString(c.getColumnIndex(MarkersTableMetaData.DESCRIPTION)));
-								g.setDirection(c.getDouble(c.getColumnIndex(MarkersTableMetaData.DIRECTION)));
-								g.setOrder(c.getInt(c.getColumnIndex(MarkersTableMetaData.ORDER)));
-								Log.d(TAG, "Direction: " + g.getDirection());
-								g.setTitle(c.getString(c.getColumnIndex(MarkersTableMetaData.TITLE)));
-                    	mCurrentMarkers.add(g);
-                    	mGeofences.add(g.toGeofence());
-					}
-//				}
-                
-//                if(!mCurrentMarkers.isEmpty()) {
-//                	addGeofences();
-//                	new ConnectThread(mBluetoothAdapter, mConnectedDevice, MARKER_STATE.INITIALIZE_LIST).execute((Marker[]) mCurrentMarkers.toArray(new Marker[]{}));
-//                }
-//                else {
-//                	mRequestType = REQUEST_TYPE.CONNECT;
-//                	mLocationClient = new LocationClient(MainActivity.this, MainActivity.this, MainActivity.this);
-//                	mLocationClient.connect();
-//                }
+				while(c.moveToNext()){
+					Marker g = new Marker();
+							g.setId((int)c.getLong(c.getColumnIndex(MarkersTableMetaData._ID)));
+							g.setTriggerLatitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.TRIGGER_LATITUDE)));
+							g.setTriggerLongitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.TRIGGER_LONGITUDE)));
+							g.setMarkerLatitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.MARKER_LATITUDE)));
+							g.setMarkerLongitude(c.getDouble(c.getColumnIndex(MarkersTableMetaData.MARKER_LONGITUDE)));
+							g.setRadius(c.getDouble(c.getColumnIndex(MarkersTableMetaData.RADIUS)));
+							g.setDescription(c.getString(c.getColumnIndex(MarkersTableMetaData.DESCRIPTION)));
+							g.setDirection(c.getDouble(c.getColumnIndex(MarkersTableMetaData.DIRECTION)));
+							g.setOrder(c.getInt(c.getColumnIndex(MarkersTableMetaData.ORDER)));
+							Log.d(TAG, "Direction: " + g.getDirection());
+							g.setTitle(c.getString(c.getColumnIndex(MarkersTableMetaData.TITLE)));
+                	mCurrentMarkers.add(g);
+                	mGeofences.add(g.toGeofence());
+				}
+
                 mLiveCardRenderer.setMarkerList(mCurrentMarkers);
         		
 				return null;

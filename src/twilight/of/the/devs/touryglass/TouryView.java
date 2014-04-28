@@ -1,18 +1,11 @@
 package twilight.of.the.devs.touryglass;
 
-import java.io.File;
 import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
-
-import com.google.android.gms.location.LocationClient;
 
 import twilight.of.the.devs.mylibrary.Marker;
 import twilight.of.the.devs.utils.DirectionUtils;
-import twilight.of.the.devs.utils.MathUtils;
-
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -27,16 +20,17 @@ import android.preference.PreferenceManager;
 import android.speech.tts.TextToSpeech;
 import android.text.DynamicLayout;
 import android.text.Layout.Alignment;
-import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.ViewGroup.LayoutParams;
-import android.widget.TextView;
 
 public class TouryView extends View {
+	
+	/*
+	 * Note: Much of the following code is adapted from the Compass Example App
+	 * 
+	 */
 
 	private static final String TAG = TouryView.class.getName();
 	private float mHeading;
@@ -58,18 +52,11 @@ public class TouryView extends View {
 	private float[] mDistance;
 	private ArrayList<Rect> mAllBounds;
 	private TouryService mService;
-	private long mLastTime;
 	private boolean hasReadAloud;
 	private Integer searchResultId;
 	private Context mContext;
-	
-	public LiveCardRenderer getRenderer() {
-		return mRenderer;
-	}
-
-	public void setRenderer(LiveCardRenderer mRenderer) {
-		this.mRenderer = mRenderer;
-	}
+	private boolean mShowTitle;
+	private boolean dimMarkers;
 
 	public TouryView(Context context) {
 		super(context);
@@ -86,6 +73,9 @@ public class TouryView extends View {
 		setupUi(context);
 	}
 	
+	/*
+	 * Sets up the initial user interface
+	 */
 	private void setupUi(Context context){
 		mContext = context;
 		mPaint = new Paint();
@@ -93,20 +83,18 @@ public class TouryView extends View {
     	mPaint.setStyle(Paint.Style.FILL);
         mPaint.setAntiAlias(true);
         mPaint.setTextSize(PLACE_TEXT_HEIGHT);
-        mPaint.setTypeface(Typeface.createFromFile(new File("/system/glass_fonts",
-                "Roboto-Thin.ttf")));
+
+        mPaint.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
         mDescPaint = new Paint();
     	mDescPaint.setColor(Color.WHITE);
     	mDescPaint.setStyle(Paint.Style.FILL);
         mDescPaint.setAntiAlias(true);
         mDescPaint.setTextSize(DESCRIPTION_TEXT_HEIGHT);
-        mDescPaint.setTypeface(Typeface.createFromFile(new File("/system/glass_fonts",
-                "Roboto-Thin.ttf")));
+
+        mDescPaint.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
 
         mTextPaint = new TextPaint(mPaint);
-//        mTextPaint2 = new TextPaint(mDescPaint);
-//        mTextLayout = new LinkedList<DynamicLayout>();
-//        mMarkerMap = new HashMap<DynamicLayout, Marker>();
+
         mNumberFormat = NumberFormat.getNumberInstance();
         mNumberFormat.setMaximumFractionDigits(2);
         mPlaceBitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.place_mark);
@@ -117,47 +105,84 @@ public class TouryView extends View {
         mDescLayout = new DynamicLayout(mTriggeredMarker.getDescription(), mTextPaint, 640, Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
         setKeepScreenOn(true);
         mAllBounds = new ArrayList<Rect>();
-        //searchResultId = 1;
+        mShowTitle = true;
 	}
 	
+	/*
+	 * Get the LiveCardRender
+	 */
+	public LiveCardRenderer getRenderer() {
+		return mRenderer;
+	}
+
+	/*
+	 * Set the LiveCardRender
+	 */
+	public void setRenderer(LiveCardRenderer mRenderer) {
+		this.mRenderer = mRenderer;
+	}
+	
+	/*
+	 * Set the current heading
+	 */
 	public void setHeading(float head){
 		mHeading = head;
 		if(mHeading < 0) mHeading = 360 + mHeading;
 	}
 	
+	/*
+	 * Sets the triggered marker.
+	 * Updates the text size, removes the title.
+	 */
 	public void setTriggeredMarker(Marker m){
 		mTriggeredMarker = m;
+		hasReadAloud = false;
+		mDescPaint.setTextSize(DESCRIPTION_TEXT_HEIGHT);
+		mShowTitle = false;
 		showTriggeredMarker();
 	}
 	
+	/*
+	 * Remove the triggered marker.
+	 */
 	public void removeTriggeredMarker(){
 		mTriggeredMarker.setDescription("");
+		mShowTitle = true;
+		mDescPaint.setTextSize(28);
 		mDescLayout = new DynamicLayout(mTriggeredMarker.getDescription(), new TextPaint(mDescPaint), 640, Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
 	}
 	
+	/*
+	 * Display the triggered marker
+	 */
 	public void showTriggeredMarker(){
+		
 		mDescLayout = new DynamicLayout(mTriggeredMarker.getDescription(), new TextPaint(mDescPaint), 640, Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
 	}
 	
+	/*
+	 * Set the marker list.
+	 */
 	public void setMarkerList(List<Marker> list){
 		if(list == null){ Log.d(TAG, "List is null"); return;}
 		mMarkerList = list;
 	}
 	
+	/*
+	 * Set the id of a marker to be displayed red.
+	 */
 	public void setSearchResultId(Integer id){
 		this.searchResultId = id;
 	}
 	
+	/*
+	 * Reads a description using text to speech.
+	 */
 	public void readDescription(String desc){
-		long currentTime  = System.currentTimeMillis();
-		//if(currentTime - mLastTime > 1000 * 5){ // wait 5 seconds to speak again
-			if(mService.getTTS() != null)
-				mService.getTTS().speak(mTriggeredMarker.getDescription(), TextToSpeech.QUEUE_FLUSH, null);
-			hasReadAloud = true;
-			//mMarkerList.remove(0);
-			//mTriggeredMarker = null;
-			//mLastTime = currentTime;
-		//}
+		if(mService.getTTS() != null)
+			mService.getTTS().speak(mTriggeredMarker.getDescription(), TextToSpeech.QUEUE_FLUSH, null);
+		//Only read once...
+		hasReadAloud = true;
 	}
 	
 	@Override
@@ -165,10 +190,15 @@ public class TouryView extends View {
 		super.onDraw(canvas);
 		canvas.drawColor(0, Mode.CLEAR);
 		
-		if(mMarkerList == null || mMarkerList.isEmpty()){
+		//Display distances if the preference is set.
+		boolean show_distances = PreferenceManager.getDefaultSharedPreferences(mContext).getBoolean("show_distances", false);
+		
+		//If there are no markers to show, display the Welcome text.
+		if(mMarkerList == null || mMarkerList.isEmpty() || mCurrentLocation == null){
 			canvas.drawText("Welcome to Toury", 20, canvas.getHeight() / 2, mDescPaint);
 		} else {
-			
+			if(mShowTitle)
+				canvas.drawText("Toury", canvas.getWidth()/2 - 15, 20, mDescPaint);
 			if(mCurrentLocation != null && mTriggeredMarker != null){
 				Location.distanceBetween(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude(), mTriggeredMarker.getMarkerLatitude(), mTriggeredMarker.getMarkerLongitude(), mDistance);	
 			}
@@ -179,14 +209,20 @@ public class TouryView extends View {
 			if(mTriggeredMarker != null && isLookingAtMarker(mDistance[0]) && !mTriggeredMarker.getDescription().isEmpty()){
 				canvas.save();
 				canvas.translate(20, 20);
+				mDescPaint.setTextSize(DESCRIPTION_TEXT_HEIGHT);
 				mDescLayout.draw(canvas);
 				canvas.restore();
 				if(!hasReadAloud)
 					readDescription(mTriggeredMarker.getDescription());
-				return;
+				dimMarkers = true;
+			} else {
+				dimMarkers = false;
+				mDescPaint.setTextSize(28);
+				canvas.drawText("Toury", canvas.getWidth()/2 - 20, 20, mDescPaint);
 			}
 			mAllBounds.clear();
 
+			//Draw all of the markers...
 			for(Marker marker : mMarkerList){
 				canvas.save();
 
@@ -216,11 +252,10 @@ public class TouryView extends View {
                 // to the right of the text, for the overlap calculations below.
                 textBounds.left -= PLACE_PIN_WIDTH + PLACE_TEXT_MARGIN;
                 textBounds.right += PLACE_TEXT_MARGIN;
+                
                 double diff = bearing - mHeading;
-                if(diff < 0 && Math.abs(diff) > 180) bearing += 360;
-//                Log.d(TAG, "Diff: " + diff);
-                textBounds.offset((int)((((diff)) / 90) * canvas.getWidth()) + 15 + canvas.getWidth()/2, 0);
-//                canvas.drawText("Bearing to " + marker.getTitle() + ": " + bearing, 20, 200, mPaint);
+                
+                textBounds.offset(getOffset(diff, canvas.getWidth()) + 15 + canvas.getWidth()/2, 0);
                 if(mTriggeredMarker != null && isLookingAtMarker(mDistance[0]) && !mTriggeredMarker.getDescription().isEmpty())
                 	textBounds.top = canvas.getHeight();
                 else
@@ -257,51 +292,91 @@ public class TouryView extends View {
                     if(mCurrentLocation != null){
                     	Location.distanceBetween(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude(), marker.getMarkerLatitude(), marker.getMarkerLongitude(), mDistance);
                     }
-                    int alpha = (int)((10 / mDistance[0])*255);
+                    int alpha = (int)((50 / mDistance[0])*255);
     				alpha = alpha > 255 ? 255 : alpha;
-    				mPaint.setAlpha(alpha);
+    				
+    				//Makes the markers faint while a description is shown.
+    				if(dimMarkers)
+    					alpha = 30;
+//    				mPaint.setAlpha(alpha);
+//    				mTextPaint.setAlpha(alpha);
     				diff = bearing - mHeading;
-                    if(diff < 0 && Math.abs(diff) > 180) bearing += 360;
-    				canvas.drawBitmap(mPlaceBitmap, (int)((((diff)) / 90)*canvas.getWidth()) - 15 + canvas.getWidth()/2, textBounds.top, mPaint);
-    				canvas.drawText(marker.getTitle(), (int)((((diff)) / 90) * canvas.getWidth()) + 15 + canvas.getWidth()/2, textBounds.top + PLACE_TEXT_HEIGHT, mTextPaint);
+
+    				//Attempt to display markers around degree 0/360
+    				for(int i = -1; i <= 1; i+=1){
+    					diff += i * 360;
+    					canvas.drawBitmap(mPlaceBitmap, getOffset(diff, canvas.getWidth()) - 15 + canvas.getWidth()/2, textBounds.top, mPaint);
+    					if(show_distances)
+    						canvas.drawText(marker.getTitle()+" (" + (int)mDistance[0] +"m)", getOffset(diff, canvas.getWidth()) + 15 + canvas.getWidth()/2, textBounds.top + PLACE_TEXT_HEIGHT, mTextPaint);
+    					else
+    						canvas.drawText(marker.getTitle(), getOffset(diff, canvas.getWidth()) + 15 + canvas.getWidth()/2, textBounds.top + PLACE_TEXT_HEIGHT, mTextPaint);
+    				}
                 }
                 if(PreferenceManager.getDefaultSharedPreferences(mContext).getBoolean("ordered", false)){
-                	//Log.d(TAG, marker.toString());
                 	break;
                 }
 			}
-			//Log.d(TAG, "Broke out of loop");
 		}
 		//Debugging: Draws the current heading and location
 		if(PreferenceManager.getDefaultSharedPreferences(mContext).getBoolean("debug", false))
-		canvas.drawText("Heading: " + mHeading, 20, 256, mPaint);
-//		if(mCurrentLocation!= null)
-//			canvas.drawText("Loc: " + mNumberFormat.format(mCurrentLocation.getLatitude()) + ", " + mNumberFormat.format(mCurrentLocation.getLongitude()), 20, 300, mPaint);
+			canvas.drawText("Heading: " + mHeading, 20, 256, mPaint);
 	}
 	
+	/*
+	 * Sets the TouryService for local access.
+	 */
 	public void setService(TouryService service){
 		this.mService = service;
 	}
 
+	/*
+	 * Retrieve the current location
+	 * @return Location the user's current location
+	 */
 	public Location getCurrentLocation() {
 		return mCurrentLocation;
 	}
 
+	/*
+	 * Set the current location
+	 * @param mCurrentLocation the user's current location
+	 */
 	public void setCurrentLocation(Location mCurrentLocation) {
 		this.mCurrentLocation = mCurrentLocation;
 	}
 	
-	public boolean isWithinTenDegrees(int one, int two){
-		return Math.abs(one - two) <= 10;
+	/*
+	 * Check if the 2 headings are within 10 degrees of each other.
+	 * @param headingOne the first heading
+	 * @param headingTwo the second heading
+	 * @return true if headingOne is within 10 degrees of headingTwo
+	 */
+	public boolean isWithinTenDegrees(int headingOne, int headingTwo){
+		return Math.abs(headingOne - headingTwo) <= 10;
 	}
 	
+	/*
+	 * Used to correctly display a marker based on the current heading.
+	 * @param bearing the bearing to a marker from the user's current location
+	 * @param width the width of the display area
+	 * @return int the correct coordinate for displaying on the screen.
+	 */
+	private int getOffset(double bearing, float width){
+		return (int)(((bearing) / 90) * width);
+	}
+	
+	/*
+	 * Determine if a user if looking at a marker.
+	 * @param distance the distance to the marker
+	 * @return true if the user's heading is within 20 degrees of the marker's bearing
+	 */
 	public boolean isLookingAtMarker(double distance){
+		if(mTriggeredMarker == null || mCurrentLocation == null) return false;
 		boolean result = false;
 		otherLocation.setLatitude(mTriggeredMarker.getMarkerLatitude());
 		otherLocation.setLongitude(mTriggeredMarker.getMarkerLongitude());
 		float bearing = (float) DirectionUtils.convertBearing(mCurrentLocation.bearingTo(otherLocation));
-//		Log.d(TAG, "Bearing: " + bearing + ", Heading: " + mHeading);
-		result = Math.abs(bearing - mHeading) <= 20;//(10.0 / (100.0 / distance));
+		result = Math.abs(bearing - mHeading) <= 20;
 		return result;
 	}
 }

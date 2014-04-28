@@ -20,6 +20,9 @@ import android.provider.BaseColumns;
 import android.text.TextUtils;
 import android.util.Log;
 
+/*
+ * Stores tours and markers in the database
+ */
 public class TouryProvider extends ContentProvider {
 	
 	public static class TouryProviderMetaData {

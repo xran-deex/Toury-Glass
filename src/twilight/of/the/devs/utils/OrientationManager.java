@@ -33,6 +33,7 @@ import android.os.Looper;
 import android.util.Log;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -96,7 +97,7 @@ public class OrientationManager {
 
     private final SensorManager mSensorManager;
     private final LocationManager mLocationManager;
-    private final String mLocationProvider;
+//    private final String mLocationProvider;
     private final Set<OnChangedListener> mListeners;
     private final float[] mRotationMatrix;
     private final float[] mOrientation;
@@ -142,12 +143,7 @@ public class OrientationManager {
                 float magneticHeading = (float) Math.toDegrees(mOrientation[0]);
                 mHeading = MathUtils.mod(computeTrueNorth(magneticHeading), 360.0f)
                         - ARM_DISPLACEMENT_DEGREES;
-//                long time = event.timestamp;
-//                if(time - mTimeSinceLastSensor > 20500000L){
                 notifyOrientationChanged();
-//                	//Log.d(TAG, ""+mTimeSinceLastSensor);
-//                }
-//                mTimeSinceLastSensor = time;
             }
         }
     };
@@ -189,15 +185,6 @@ public class OrientationManager {
         mSensorManager = sensorManager;
         mLocationManager = locationManager;
         mListeners = new LinkedHashSet<OnChangedListener>();
-
-        Criteria criteria = new Criteria();
-        criteria.setAccuracy(Criteria.ACCURACY_FINE);
-        criteria.setBearingRequired(false);
-        criteria.setSpeedRequired(false);
-
-        mLocationProvider = mLocationManager.getBestProvider(criteria, true /* enabledOnly */);
-        if(mLocationProvider == null)
-        Log.d(TAG, "Location provider is null");
     }
 
     /**
@@ -241,8 +228,15 @@ public class OrientationManager {
                 }
             }
 
-            if (mLocationProvider != null) {
-                mLocationManager.requestLocationUpdates(mLocationProvider,
+            Criteria criteria = new Criteria();
+            criteria.setAccuracy(Criteria.ACCURACY_FINE);
+            criteria.setBearingRequired(false);
+            criteria.setSpeedRequired(false);
+
+            List<String> providers =
+                    mLocationManager.getProviders(criteria, true /* enabledOnly */);
+            for (String provider : providers) {
+                mLocationManager.requestLocationUpdates(provider,
                         MILLIS_BETWEEN_LOCATIONS, METERS_BETWEEN_LOCATIONS, mLocationListener,
                         Looper.getMainLooper());
             }
@@ -257,6 +251,7 @@ public class OrientationManager {
      */
     public void stop() {
         if (mTracking) {
+        	Log.d(TAG, "Stopping OM");
             mSensorManager.unregisterListener(mSensorListener);
             mLocationManager.removeUpdates(mLocationListener);
             mTracking = false;

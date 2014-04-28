@@ -170,12 +170,7 @@ public class TouryREST {
                 HttpResponse response;
 
                 try {
-//                    HttpGet post = new HttpGet("http://valis.strangled.net:7000/api/tours/");
-//                    String authorizationString = "Basic " + Base64.encodeToString(
-//    				        ("randy" + ":" + "greenday").getBytes(),
-//    				        Base64.NO_WRAP); 
-//                                        
-//                    post.addHeader("Authorization", authorizationString);
+
                 	HttpGet post = new HttpGet("http://valis.strangled.net:7000/tours?format=json");
                     response = client.execute(post);
 
@@ -183,16 +178,13 @@ public class TouryREST {
                     if(response!=null){
                         InputStream in = response.getEntity().getContent(); //Get the data in the entity
                         String res = new DataInputStream(in).readLine();
-//                        JSONObject obj = new JSONObject(res);
-//                        JSONArray results = obj.getJSONArray("results");
                         JSONArray results = new JSONArray(res);
                         Log.d(TAG, results.toString());
 
-                        
+                        //Loop through the results and add them to the list of markers
                        for(int i = 1; i <= results.length(); i++){
                         	JSONObject j = results.getJSONObject(i-1);
                         	
-//                        	Tour tour = new Tour(j.getInt("id"), j.getString("name"));
                         	Tour tour = new Tour(j.getInt("pk"), j.getJSONObject("fields").getString("name"));
                         	post = new HttpGet("http://valis.strangled.net:7000/tour/"+tour.getId() +"/?format=json");
 

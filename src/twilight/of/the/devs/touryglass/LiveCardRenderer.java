@@ -29,6 +29,9 @@ import android.widget.FrameLayout;
 import com.google.android.glass.timeline.DirectRenderingCallback;
 import twilight.of.the.devs.mylibrary.*;
 
+/*
+ * Renderer for the LiveCard
+ */
 public class LiveCardRenderer implements DirectRenderingCallback {
 
     // About 30 FPS.
@@ -59,34 +62,22 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 		}
 	};
 	
-	private BroadcastReceiver mMarkerReceiver = new BroadcastReceiver(){
-
-		@Override
-		public void onReceive(Context context, final Intent intent) {
-//			Log.d(TAG, "Received marker");
-//			MARKER_STATE state = (MARKER_STATE)intent.getSerializableExtra("type");
-//			mHeadingView.setRenderer(LiveCardRenderer.this);
-//			if(state == MARKER_STATE.ENTERED){
-//				mService.getTTS().speak("There is something to look at.", TextToSpeech.QUEUE_FLUSH, null);
-//			} else if (state == MARKER_STATE.DWELLING){
-//				mHeadingView.setTriggeredMarker((Marker)intent.getSerializableExtra("loc"));
-//			} else if (state == MARKER_STATE.EXITED){
-//				mHeadingView.setMarkerList(new LinkedList<Marker>());
-//			}
-		}
-	};
-	
+	/*
+	 * Receives broadcasts of triggered geofences.
+	 */
 	private BroadcastReceiver mGeofenceReceiver = new BroadcastReceiver(){
 
 		@Override
 		public void onReceive(Context context, final Intent intent) {
 			Log.d(TAG, "Received marker");
 			
+			//Check the geofence state -> DWELLING, ENTERED, or EXITED
 			MARKER_STATE state = (MARKER_STATE)intent.getSerializableExtra("type");
 			Marker marker = (Marker)intent.getSerializableExtra("marker");
 			mTouryView.setRenderer(LiveCardRenderer.this);
+			
+			//If the state is entered, notify the user to look in its direction and set the triggered marker
 			if(state == MARKER_STATE.ENTERED){
-				
 				Location location = new Location("");
 				location.setLatitude(marker.getMarkerLatitude());
 				location.setLongitude(marker.getMarkerLongitude());
@@ -104,7 +95,8 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 						mService.getTTS().speak("There is something to look at behind you.", TextToSpeech.QUEUE_ADD, null);
 				}
 				mTouryView.setTriggeredMarker(marker);
-			} else if (state == MARKER_STATE.DWELLING){
+				
+			} else if (state == MARKER_STATE.DWELLING){ //if the state is DWELLING, show the description on the screen
 //				if(mService.getTTS() != null)
 //					mService.getTTS().speak("You are dwelling in a geofence." + marker.getDescription(), TextToSpeech.QUEUE_FLUSH, null);
 				Log.d(TAG, "Dwelling in " + marker.getTitle());
@@ -115,15 +107,13 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 					mTouryView.setMarkerList(mMarkerList);
 					geofenceManager.setMarkerList(mMarkerList);
 				}
-			} else if (state == MARKER_STATE.EXITED){
+			} else if (state == MARKER_STATE.EXITED){ //if state is EXIT, remove the marker
 //				if(mService.getTTS() != null)
 //					mService.getTTS().speak("You have left a geofence.", TextToSpeech.QUEUE_FLUSH, null);
 				mTouryView.removeTriggeredMarker();
 			}
 		}
 	};
-
-	private ServerThread mServerThread;
 
 	private GeofenceManager geofenceManager;
 	
@@ -132,28 +122,33 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 		this.mService = context;
 		LayoutInflater inflater = LayoutInflater.from(mContext);
 		FrameLayout layout = (FrameLayout)inflater.inflate(R.layout.activity_main, null);
-		mServerThread = new ServerThread(context);
-		mServerThread.start();
 		LocalBroadcastManager.getInstance(context).registerReceiver(mReceiver, new IntentFilter("location"));
-		//LocalBroadcastManager.getInstance(context).registerReceiver(mMarkerReceiver, new IntentFilter("marker"));
 		LocalBroadcastManager.getInstance(context).registerReceiver(mGeofenceReceiver, new IntentFilter("geofence"));
 		
+		//Create the view
 		mTouryView = (TouryView)layout.findViewById(R.id.heading);
 		mTouryView.setRenderer(this);
 		mTouryView.setService(mService);
+		
 		setMarkerList(new LinkedList<Marker>());
+		
+		//Set up the geofence manager
 		geofenceManager = new GeofenceManager(mMarkerList, mService);
 		geofenceManager.setMarkerList(mMarkerList);
+		
+		//Set up the sensor and location managers
 		SensorManager sensorManager =
                 (SensorManager) mContext.getSystemService(Context.SENSOR_SERVICE);
         LocationManager locationManager =
                 (LocationManager) mContext.getSystemService(Context.LOCATION_SERVICE);
         
+        //Set up the orientation tracking
     	mOrientationManager = new OrientationManager(sensorManager, locationManager);
     	mOrientationManager.addOnChangedListener(new OnChangedListener() {
 			
 			@Override
 			public void onOrientationChanged(OrientationManager orientationManager) {
+				//Set the headings and locations
 				mHeading = mOrientationManager.getHeading();
 				mTouryView.setHeading(mHeading);
 				mTouryView.setCurrentLocation(orientationManager.getLocation());
@@ -162,6 +157,7 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 			@Override
 			public void onLocationChanged(OrientationManager orientationManager) {
 				Log.d(TAG, "Location changed");
+				//Reset the location when it changes
 				mCurrentLocation = orientationManager.getLocation();
 				mTouryView.setCurrentLocation(orientationManager.getLocation());
 				geofenceManager.checkGeofences(orientationManager.getLocation());
@@ -178,10 +174,15 @@ public class LiveCardRenderer implements DirectRenderingCallback {
 		return Math.abs(one - two) <= 10;
 	}
 	
+	/*
+	 * Get the current TouryView
+	 */
 	public TouryView getTouryView(){
 		return mTouryView;
 	}
-
+	
+	
+	//Surface callbacks...
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
     }
@@ -199,10 +200,9 @@ public class LiveCardRenderer implements DirectRenderingCallback {
     public void surfaceDestroyed(SurfaceHolder holder) {
         mHolder = null;
 
-        mServerThread.closeSocket();
         mRenderThread.quit();
         mRenderThread = null;
-        mOrientationManager.stop();
+        //mOrientationManager.stop();
         
 //        updateRendering();
     }
@@ -230,6 +230,17 @@ public class LiveCardRenderer implements DirectRenderingCallback {
             }
         }
     }
+    
+    public void shutDown(){
+    	if(mOrientationManager != null){
+    		mOrientationManager.stop();
+    		mOrientationManager = null;
+    	}
+    	if(mRenderThread != null){
+    		mRenderThread.quit();
+    		mRenderThread = null;
+    	}
+    }
 
     /**
      * Draws the view in the SurfaceHolder's canvas.
@@ -247,10 +258,18 @@ public class LiveCardRenderer implements DirectRenderingCallback {
         }
     }
 
+    /*
+     * Getter for the marker list
+     */
     public List<Marker> getMarkerList() {
 		return mMarkerList;
 	}
 
+    /*
+     * Sets the marker list
+     * @param mMarkerList the marker list to be set
+     * Side-effect: This method sorts the list according to its order property
+     */
 	public void setMarkerList(List<Marker> mMarkerList) {
 		this.mMarkerList = mMarkerList;
 		Log.d(TAG, "Before sort: " + this.mMarkerList.toString());
